@@ -1,0 +1,282 @@
+import streamlit as st
+import math
+
+st.set_page_config(
+    page_title="Taschenrechner von Maksym",
+    page_icon="🧮",
+    layout="centered"
+)
+
+# Custom Styling (CSS) - Real Calculator Design inspired by Casio ClassWiz / Dark Mode
+st.markdown("""
+<style>
+    /* Main Background */
+    .stApp {
+        background-color: #0f1115;
+        color: #e0e0e0;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    /* Main block container styling to mimic a physical calculator body */
+    .main .block-container {
+        max-width: 420px;
+        padding: 20px 20px 30px 20px;
+        background: linear-gradient(145deg, #1e222b, #14171d);
+        border-radius: 28px;
+        border: 2px solid #2a2f3a;
+        box-shadow: 0px 20px 50px rgba(0, 0, 0, 0.8), inset 0px 1px 2px rgba(255, 255, 255, 0.1);
+        margin-top: 20px;
+        margin-bottom: 20px;
+    }
+    
+    /* Title / Header */
+    h1 {
+        text-align: center;
+        color: #d1d5db;
+        font-family: 'Helvetica Neue', Arial, sans-serif;
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: 1.5px;
+        margin-top: 5px;
+        margin-bottom: 15px;
+        text-transform: uppercase;
+        border-bottom: 1px solid #2a2f3a;
+        padding-bottom: 10px;
+    }
+    
+    /* Calculator Screen / LCD Display */
+    .lcd-screen {
+        background-color: #b0c4b1; /* Classic green-ish Casio LCD background */
+        color: #1a251b; /* LCD Dark Pixel color */
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin-bottom: 20px;
+        text-align: right;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 30px;
+        font-weight: bold;
+        min-height: 70px;
+        line-height: 38px;
+        box-shadow: inset 3px 3px 8px rgba(0,0,0,0.4), inset -2px -2px 5px rgba(255,255,255,0.2);
+        border: 4px solid #111;
+        overflow-x: auto;
+        word-break: break-all;
+    }
+
+    .lcd-sub {
+        font-size: 12px;
+        color: #2d4030;
+        text-align: left;
+        height: 16px;
+        font-family: sans-serif;
+        font-weight: normal;
+        margin-bottom: 2px;
+    }
+
+    /* Base style for all buttons */
+    div.stButton > button {
+        width: 100%;
+        height: 48px;
+        border-radius: 8px;
+        border: none;
+        background: linear-gradient(180deg, #3a3f4d 0%, #2b2f3a 100%);
+        color: #ffffff;
+        font-size: 18px;
+        font-weight: 600;
+        box-shadow: 0 4px 0 #181a20, 0 5px 10px rgba(0,0,0,0.5);
+        transition: all 0.05s ease;
+        margin-bottom: 6px;
+    }
+    
+    div.stButton > button:active {
+        transform: translateY(3px);
+        box-shadow: 0 1px 0 #181a20, 0 2px 5px rgba(0,0,0,0.5);
+    }
+    
+    div.stButton > button:hover {
+        background: linear-gradient(180deg, #454b5b 0%, #323744 100%);
+        color: #ffffff;
+    }
+    
+    /* Number buttons (white/light keycaps) */
+    .btn-num div.stButton > button {
+        background: linear-gradient(180deg, #e6e8eb 0%, #ced2d9 100%);
+        color: #111111;
+        font-weight: bold;
+        font-size: 20px;
+        box-shadow: 0 4px 0 #9ca3af, 0 5px 10px rgba(0,0,0,0.5);
+    }
+    .btn-num div.stButton > button:hover {
+        background: linear-gradient(180deg, #ffffff 0%, #dbe0e6 100%);
+        color: #000000;
+    }
+    
+    /* DEL / AC buttons (blue) */
+    .btn-del div.stButton > button, .btn-ac div.stButton > button {
+        background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
+        color: #ffffff;
+        font-weight: bold;
+        box-shadow: 0 4px 0 #1e40af, 0 5px 10px rgba(0,0,0,0.5);
+    }
+    .btn-del div.stButton > button:hover, .btn-ac div.stButton > button:hover {
+        background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+    }
+
+    /* Equals button (accent highlight) */
+    .btn-eq div.stButton > button {
+        background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+        color: #ffffff;
+        font-weight: bold;
+        font-size: 22px;
+        box-shadow: 0 4px 0 #047857, 0 5px 10px rgba(0,0,0,0.5);
+    }
+    .btn-eq div.stButton > button:hover {
+        background: linear-gradient(180deg, #34d399 0%, #10b981 100%);
+    }
+
+    /* Scientific / Small Top Function buttons */
+    .btn-sci div.stButton > button {
+        height: 40px;
+        font-size: 14px;
+        background: linear-gradient(180deg, #2d323e 0%, #21252f 100%);
+        color: #9ca3af;
+        box-shadow: 0 3px 0 #12141a, 0 4px 8px rgba(0,0,0,0.5);
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Session State Initialisierung
+if "display" not in st.session_state:
+    st.session_state.display = "0"
+if "last_ans" not in st.session_state:
+    st.session_state.last_ans = "0"
+if "reset_next" not in st.session_state:
+    st.session_state.reset_next = False
+
+# Funktionen für Tastenaktionen
+def add_char(char):
+    if st.session_state.reset_next:
+        if char in ["+", "−", "×", "÷", "^", "%"]:
+            st.session_state.reset_next = False
+        else:
+            st.session_state.display = ""
+            st.session_state.reset_next = False
+        
+    if st.session_state.display == "0" and char not in [".", "+", "−", "×", "÷", "%", "^"]:
+        st.session_state.display = char
+    else:
+        st.session_state.display += char
+
+def clear_all():
+    st.session_state.display = "0"
+    st.session_state.reset_next = False
+
+def delete_char():
+    if st.session_state.reset_next:
+        st.session_state.display = "0"
+        st.session_state.reset_next = False
+    elif len(st.session_state.display) > 1:
+        st.session_state.display = st.session_state.display[:-1]
+    else:
+        st.session_state.display = "0"
+
+def add_func(func_name):
+    if st.session_state.reset_next:
+        st.session_state.display = ""
+        st.session_state.reset_next = False
+    if st.session_state.display == "0":
+        st.session_state.display = f"{func_name}("
+    else:
+        st.session_state.display += f"{func_name}("
+
+def calculate():
+    expr = st.session_state.display
+    try:
+        # Pre-process math string for python eval
+        expr_clean = expr.replace("×", "*").replace("÷", "/").replace("−", "-").replace("^", "**")
+        
+        # Math context for scientific operations
+        math_env = {
+            "sin": lambda x: math.sin(math.radians(x)),
+            "cos": lambda x: math.cos(math.radians(x)),
+            "tan": lambda x: math.tan(math.radians(x)),
+            "sqrt": math.sqrt,
+            "log": math.log10,
+            "ln": math.log,
+            "pi": math.pi,
+            "e": math.e,
+            "Ans": float(st.session_state.last_ans) if st.session_state.last_ans != "Fehler" else 0
+        }
+        
+        res = eval(expr_clean, {"__builtins__": None}, math_env)
+        
+        if isinstance(res, (int, float)):
+            if abs(res) < 1e-12 and res != 0:
+                res = 0
+            if res == int(res):
+                res_str = str(int(res))
+            else:
+                res_str = str(round(res, 8))
+            st.session_state.display = res_str
+            st.session_state.last_ans = res_str
+        else:
+            st.session_state.display = "Fehler"
+    except Exception:
+        st.session_state.display = "Fehler"
+        
+    st.session_state.reset_next = True
+
+# --- CALCULATOR UI ---
+
+st.title("Taschenrechner von Maksym")
+
+# LCD Display Area
+st.markdown(
+    f'<div class="lcd-screen"><div class="lcd-sub">CLASSWIZ</div>{st.session_state.display}</div>',
+    unsafe_allow_html=True
+)
+
+# Keypad Rows Layout
+sci_row1 = [("x²", "sci", "^2"), ("xⁿ", "sci", "^"), ("sin", "sci", "sin"), ("cos", "sci", "cos"), ("tan", "sci", "tan")]
+sci_row2 = [("√", "sci", "sqrt"), ("log", "sci", "log"), ("ln", "sci", "ln"), ("(", "sci", "("), (")", "sci", ")")]
+
+num_grid = [
+    [("7", "num"), ("8", "num"), ("9", "num"), ("DEL", "del"), ("AC", "ac")],
+    [("4", "num"), ("5", "num"), ("6", "num"), ("×", "op"), ("÷", "op")],
+    [("1", "num"), ("2", "num"), ("3", "num"), ("+", "op"), ("−", "op")],
+    [("0", "num"), (".", "num"), ("%", "op"), ("Ans", "sci"), ("=", "eq")]
+]
+
+# Render Scientific Rows
+for row in [sci_row1, sci_row2]:
+    cols = st.columns(5)
+    for idx, (label, btn_style, val) in enumerate(row):
+        with cols[idx]:
+            st.markdown(f'<div class="btn-{btn_style}">', unsafe_allow_html=True)
+            if val in ["sin", "cos", "tan", "sqrt", "log", "ln"]:
+                st.button(label, key=f"btn_{label}", on_click=add_func, args=(val,))
+            elif val == "^2":
+                st.button(label, key=f"btn_{label}", on_click=add_char, args=("^2",))
+            else:
+                st.button(label, key=f"btn_{label}", on_click=add_char, args=(val,))
+            st.markdown('</div>', unsafe_allow_html=True)
+
+st.write("") # Small spacer
+
+# Render Main Numeric and Control Pad
+for row in num_grid:
+    cols = st.columns(5)
+    for idx, (label, btn_style) in enumerate(row):
+        with cols[idx]:
+            st.markdown(f'<div class="btn-{btn_style}">', unsafe_allow_html=True)
+            if label == "AC":
+                st.button(label, key="btn_AC", on_click=clear_all)
+            elif label == "DEL":
+                st.button(label, key="btn_DEL", on_click=delete_char)
+            elif label == "=":
+                st.button(label, key="btn_EQ", on_click=calculate)
+            elif label == "Ans":
+                st.button(label, key="btn_Ans", on_click=add_char, args=("Ans",))
+            else:
+                st.button(label, key=f"btn_{label}", on_click=add_char, args=(label,))
+            st.markdown('</div>', unsafe_allow_html=True)
